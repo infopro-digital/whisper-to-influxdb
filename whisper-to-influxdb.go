@@ -114,16 +114,25 @@ func influxWorker() {
 		basename := strings.TrimSuffix(abstractSerie.Path[len(whisperDir)+1:], ".wsp")
 		measure := strings.Replace(basename, "/", ".", -1)
 
+		// Split measurement to find some useful things
+		measureSplited := strings.Split(measure, ".")
+		if len(measureSplited) <= 2 {
+			log.Printf("Strange measure: %s. Ignoring.\n", measure)
+			continue
+		}
+
+		// Reassemble without host
+		measureKey := strings.Join(measureSplited[2:], "-")
+
 		// TODO: if there are no points, we can just break out
 		for _, abstractPoint := range abstractSerie.Points {
-			p, _ := client.NewPoint(measure,
+			p, _ := client.NewPoint(measureSplited[1],
 				map[string]string{
-					"host": "",
+					"host": measureSplited[0],
 				},
 				map[string]interface{}{
-					"time":            abstractPoint.Timestamp,
-					"sequence_number": 1,
-					"value":           abstractPoint.Value,
+					"time":     abstractPoint.Timestamp,
+					measureKey: abstractPoint.Value,
 				},
 				time.Unix(int64(abstractPoint.Timestamp), 0),
 			)
