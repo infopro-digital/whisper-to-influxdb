@@ -123,13 +123,24 @@ func influxWorker() {
 
 		// Reassemble without host
 		measureKey := strings.Join(measureSplited[2:], "-")
+		measureSplitedLen := len(measureSplited)
+		measureName := measureSplited[1]
 
 		// TODO: if there are no points, we can just break out
 		for _, abstractPoint := range abstractSerie.Points {
-			p, _ := client.NewPoint(measureSplited[1],
-				map[string]string{
-					"host": measureSplited[0],
-				},
+			tags := map[string]string{
+				"host": measureSplited[0],
+			}
+
+			if measureSplitedLen == 5 {
+				switch measureSplited[3] {
+				case "cpu":
+					measureKey = measureSplited[4]
+					tags["cpu"] = fmt.Sprintf("cpu%s", measureSplited[2])
+				}
+			}
+
+			p, _ := client.NewPoint(measureName, tags,
 				map[string]interface{}{
 					"time":     abstractPoint.Timestamp,
 					measureKey: abstractPoint.Value,
