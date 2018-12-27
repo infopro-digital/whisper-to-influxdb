@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/influxdb/influxdb/client"
+	"github.com/influxdata/influxdb/client/v2"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/rcrowley/go-metrics"
 	"log"
@@ -27,7 +27,7 @@ var influxSeries chan *abstractSerie
 var influxHost, influxUser, influxPass, influxDb string
 var influxPort uint
 
-var influxClient *client.Client
+var influxClient client.Client
 
 var whisperReadTimer metrics.Timer
 var influxWriteTimer metrics.Timer
@@ -45,8 +45,8 @@ var skipWhisperErrors bool
 var statsInterval uint
 var exit chan int
 
-func seriesString(s *client.Series) string {
-	return fmt.Sprintf("InfluxDB series '%s' (%d points)", s.Name, len(s.Points))
+func seriesString(bp client.BatchPoints) string {
+	return fmt.Sprintf("InfluxDB series (%d points)", len(bp.Points()))
 }
 
 // needed to keep track of what's the next file in line that needs processing
@@ -106,30 +106,37 @@ func keepOrder() {
 
 func influxWorker() {
 	for abstractSerie := range influxSeries {
-		influxPoints := make([][]interface{}, len(abstractSerie.Points), len(abstractSerie.Points))
-		// TODO: if there are no points, we can just break out
-		for i, abstractPoint := range abstractSerie.Points {
-			influxPoint := make([]interface{}, 3, 3)
-			influxPoint[0] = abstractPoint.Timestamp
-			influxPoint[1] = 1
-			influxPoint[2] = abstractPoint.Value
+		bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+			Precision: "s",
+			Database:  influxDb,
+		})
 
-			influxPoints[i] = influxPoint
-		}
 		basename := strings.TrimSuffix(abstractSerie.Path[len(whisperDir)+1:], ".wsp")
-		name := strings.Replace(basename, "/", ".", -1)
-		influxSerie := client.Series{
-			Name:    influxPrefix + name,
-			Columns: []string{"time", "sequence_number", "value"},
-			Points:  influxPoints,
+		measure := strings.Replace(basename, "/", ".", -1)
+
+		// TODO: if there are no points, we can just break out
+		for _, abstractPoint := range abstractSerie.Points {
+			p, _ := client.NewPoint(measure,
+				map[string]string{
+					"host": "",
+				},
+				map[string]interface{}{
+					"time":            abstractPoint.Timestamp,
+					"sequence_number": 1,
+					"value":           abstractPoint.Value,
+				},
+				time.Unix(int64(abstractPoint.Timestamp), 0),
+			)
+
+			bp.AddPoint(p)
 		}
+
 		pre := time.Now()
-		toCommit := []*client.Series{&influxSerie}
 		for {
-			err := influxClient.WriteSeriesWithTimePrecision(toCommit, client.Second)
+			err := influxClient.Write(bp)
 			duration := time.Since(pre)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to write %s: %s (operation took %v)\n", seriesString(&influxSerie), err.Error(), duration)
+				_, _ = fmt.Fprintf(os.Stderr, "Failed to write batch point (operation took %v)\n", duration)
 				if skipInfluxErrors {
 					time.Sleep(time.Duration(5) * time.Second) // give InfluxDB to recover
 					continue
@@ -137,9 +144,6 @@ func influxWorker() {
 					exit <- 2
 					time.Sleep(time.Duration(100) * time.Second) // give other things chance to complete, and program to exit, without printing "committed"
 				}
-			}
-			if verbose {
-				fmt.Println("committed", seriesString(&influxSerie))
 			}
 			influxWriteTimer.Update(duration)
 			finishedFiles <- abstractSerie.Path
@@ -305,15 +309,14 @@ func main() {
 	fromTime = uint32(from)
 	untilTime = uint32(until)
 
-	cfg := &client.ClientConfig{
-		Host:     fmt.Sprintf("%s:%d", influxHost, influxPort),
+	cfg := client.HTTPConfig{
+		Addr:     fmt.Sprintf("http://%s:%d", influxHost, influxPort),
 		Username: influxUser,
 		Password: influxPass,
-		Database: influxDb,
 	}
 
 	var err error
-	influxClient, err = client.NewClient(cfg)
+	influxClient, err = client.NewHTTPClient(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
