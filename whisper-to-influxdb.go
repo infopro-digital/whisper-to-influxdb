@@ -246,7 +246,7 @@ func influxWorker() {
 			err := influxClient.Write(bp)
 			duration := time.Since(pre)
 			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "Failed to write batch point (operation took %v)\n", duration)
+				_, _ = fmt.Fprintf(os.Stderr, "Failed to write batch point (operation took %v). Error was: %v\n", duration, err)
 				if skipInfluxErrors {
 					time.Sleep(time.Duration(5) * time.Second) // give InfluxDB to recover
 					continue
