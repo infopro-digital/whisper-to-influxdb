@@ -106,7 +106,7 @@ func keepOrder() {
 }
 
 func influxWorker() {
-	haproxyRegexp := regexp.MustCompile(`^\[proxy_name=(.+),service_name=(.+)]?$`)
+	haproxyRegexp := regexp.MustCompile(`^\[proxy_name=(.+),service_name=(.+)$`)
 
 	for abstractSerie := range influxSeries {
 		bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
@@ -143,89 +143,63 @@ func influxWorker() {
 						switch measureSplited[4] {
 						case "bytes_in":
 							measureKey = "bin"
-							break
 						case "bytes_out":
 							measureKey = "bout"
-							break
 						case "cli_abrt":
 							measureKey = "cli_abort"
-							break
 						case "connect_time_avg":
 							measureKey = "ctime"
-							break
 						case "denied_request":
 							measureKey = "dreq"
-							break
 						case "denied_response":
 							measureKey = "dresp"
-							break
 						case "error_connection":
 							measureKey = "econ"
-							break
 						case "error_request":
 							measureKey = "ereq"
-							break
 						case "error_response":
 							measureKey = "eresp"
-							break
 						case "session_rate":
 							measureKey = "rate"
-							break
 						case "request_rate":
 							measureKey = "req_rate"
 						case "response_1xx":
 							measureKey = "http_response.1xx"
-							break
 						case "response_2xx":
 							measureKey = "http_response.2xx"
-							break
 						case "response_3xx":
 							measureKey = "http_response.3xx"
-							break
 						case "response_4xx":
 							measureKey = "http_response.4xx"
-							break
 						case "response_5xx":
 							measureKey = "http_response.5xx"
-							break
 						case "response_other":
 							measureKey = "http_response.other"
-							break
 						case "queue_time_avg":
 							measureKey = "qtime"
-							break
 						case "queue_current":
 							measureKey = "qcur"
-							break
 						case "redistributed":
 							measureKey = "wredis"
-							break
 						case "retries":
 							measureKey = "wret"
 						case "response_time_avg":
 							measureKey = "rtime"
-							break
 						case "session_current":
 							measureKey = "scur"
-							break
 						case "session_total":
 							measureKey = "stot"
-							break
 						case "srv_abrt":
 							measureKey = "srv_abort"
-							break
-						case "comp_byp":
-						case "comp_in":
-						case "comp_out":
-						case "comp_rsp":
-						case "downtime":
-						case "req_tot":
-							measureKey = measureSplited[4]
-							break
+						//case "comp_byp":
+						//case "comp_in":
+						//case "comp_out":
+						//case "comp_rsp":
+						//case "downtime":
+						//case "req_tot":
 						default:
-							log.Printf("Unhandled haproxy metric: %s, keeping this name\n", measureSplited[4])
+							//log.Printf("Unhandled haproxy metric: %s, keeping this name\n", measureSplited[4])
 							measureKey = measureSplited[4]
-							break
 						}
 
 						rpResults := haproxyRegexp.FindStringSubmatch(measureSplited[2])
@@ -237,18 +211,15 @@ func influxWorker() {
 							continue
 						}
 
+						// The regexp is not perfect i know...
 						tags["proxy"] = rpResults[1]
-						tags["type"] = strings.ToLower(rpResults[2])
-						continue
+						tags["type"] = strings.Replace(strings.ToLower(rpResults[2]), "]", "", -1)
 					}
 
 					switch measureSplited[3] {
 					case "cpu":
 						measureKey = measureSplited[4]
 						tags["cpu"] = fmt.Sprintf("cpu%s", measureSplited[2])
-						break
-					case "haproxy":
-						break
 					}
 				} else {
 					switch measureSplited[1] {
