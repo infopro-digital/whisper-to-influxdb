@@ -107,6 +107,7 @@ func keepOrder() {
 
 func influxWorker() {
 	haproxyRegexp := regexp.MustCompile(`^\[proxy_name=(.+),service_name=(.+)$`)
+	castTo := 0
 
 	for abstractSerie := range influxSeries {
 		bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
@@ -136,6 +137,8 @@ func influxWorker() {
 				"host": strings.Replace(measureSplited[0], "_", ".", -1),
 			}
 
+			castTo = 0
+
 			if measureSplitedLen >= 2 {
 				if measureSplitedLen == 5 {
 					switch measureSplited[1] {
@@ -143,10 +146,13 @@ func influxWorker() {
 						switch measureSplited[4] {
 						case "bytes_in":
 							measureKey = "bin"
+							castTo = 1
 						case "bytes_out":
 							measureKey = "bout"
+							castTo = 1
 						case "cli_abrt":
 							measureKey = "cli_abort"
+							castTo = 1
 						case "connect_time_avg":
 							measureKey = "ctime"
 						case "denied_request":
@@ -191,10 +197,12 @@ func influxWorker() {
 							measureKey = "stot"
 						case "srv_abrt":
 							measureKey = "srv_abort"
+						case "comp_rsp":
+							measureKey = measureSplited[4]
+							castTo = 1
 						//case "comp_byp":
 						//case "comp_in":
 						//case "comp_out":
-						//case "comp_rsp":
 						//case "downtime":
 						//case "req_tot":
 						default:
@@ -230,13 +238,25 @@ func influxWorker() {
 				}
 			}
 
-			p, _ := client.NewPoint(measureName, tags,
-				map[string]interface{}{
-					"time":     abstractPoint.Timestamp,
-					measureKey: abstractPoint.Value,
-				},
-				time.Unix(int64(abstractPoint.Timestamp), 0),
-			)
+			var p *client.Point
+			switch castTo {
+			case 1:
+				p, _ = client.NewPoint(measureName, tags,
+					map[string]interface{}{
+						"time":     abstractPoint.Timestamp,
+						measureKey: int64(abstractPoint.Value),
+					},
+					time.Unix(int64(abstractPoint.Timestamp), 0),
+				)
+			default:
+				p, _ = client.NewPoint(measureName, tags,
+					map[string]interface{}{
+						"time":     abstractPoint.Timestamp,
+						measureKey: abstractPoint.Value,
+					},
+					time.Unix(int64(abstractPoint.Timestamp), 0),
+				)
+			}
 
 			bp.AddPoint(p)
 		}
