@@ -270,24 +270,24 @@ func influxWorker() {
 			bp.AddPoint(p)
 		}
 
-		//pre := time.Now()
-		//for {
-		//	err := influxClient.Write(bp)
-		//	duration := time.Since(pre)
-		//	if err != nil {
-		//		_, _ = fmt.Fprintf(os.Stderr, "Failed to write batch point (operation took %v)\n", duration)
-		//		if skipInfluxErrors {
-		//			time.Sleep(time.Duration(5) * time.Second) // give InfluxDB to recover
-		//			continue
-		//		} else {
-		//			exit <- 2
-		//			time.Sleep(time.Duration(100) * time.Second) // give other things chance to complete, and program to exit, without printing "committed"
-		//		}
-		//	}
-		//	influxWriteTimer.Update(duration)
-		//	finishedFiles <- abstractSerie.Path
-		//	break
-		//}
+		pre := time.Now()
+		for {
+			err := influxClient.Write(bp)
+			duration := time.Since(pre)
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "Failed to write batch point (operation took %v)\n", duration)
+				if skipInfluxErrors {
+					time.Sleep(time.Duration(5) * time.Second) // give InfluxDB to recover
+					continue
+				} else {
+					exit <- 2
+					time.Sleep(time.Duration(100) * time.Second) // give other things chance to complete, and program to exit, without printing "committed"
+				}
+			}
+			influxWriteTimer.Update(duration)
+			finishedFiles <- abstractSerie.Path
+			break
+		}
 
 	}
 	influxWorkersWg.Done()
