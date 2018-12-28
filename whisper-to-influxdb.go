@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -105,6 +106,8 @@ func keepOrder() {
 }
 
 func influxWorker() {
+	haproxyRegexp := regexp.MustCompile(`^\[proxy_name=(.+),service_name=(.+)]?$`)
+
 	for abstractSerie := range influxSeries {
 		bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
 			Precision: "s",
@@ -129,14 +132,130 @@ func influxWorker() {
 		// TODO: if there are no points, we can just break out
 		for _, abstractPoint := range abstractSerie.Points {
 			tags := map[string]string{
-				"host": measureSplited[0],
+				// Host are encoded with _, replace with .
+				"host": strings.Replace(measureSplited[0], "_", ".", -1),
 			}
 
-			if measureSplitedLen == 5 {
-				switch measureSplited[3] {
-				case "cpu":
-					measureKey = measureSplited[4]
-					tags["cpu"] = fmt.Sprintf("cpu%s", measureSplited[2])
+			if measureSplitedLen >= 2 {
+				if measureSplitedLen == 5 {
+					switch measureSplited[1] {
+					case "haproxy":
+						switch measureSplited[4] {
+						case "bytes_in":
+							measureKey = "bin"
+							break
+						case "bytes_out":
+							measureKey = "bout"
+							break
+						case "cli_abrt":
+							measureKey = "cli_abort"
+							break
+						case "connect_time_avg":
+							measureKey = "ctime"
+							break
+						case "denied_request":
+							measureKey = "dreq"
+							break
+						case "denied_response":
+							measureKey = "dresp"
+							break
+						case "error_connection":
+							measureKey = "econ"
+							break
+						case "error_request":
+							measureKey = "ereq"
+							break
+						case "error_response":
+							measureKey = "eresp"
+							break
+						case "session_rate":
+							measureKey = "rate"
+							break
+						case "request_rate":
+							measureKey = "req_rate"
+						case "response_1xx":
+							measureKey = "http_response.1xx"
+							break
+						case "response_2xx":
+							measureKey = "http_response.2xx"
+							break
+						case "response_3xx":
+							measureKey = "http_response.3xx"
+							break
+						case "response_4xx":
+							measureKey = "http_response.4xx"
+							break
+						case "response_5xx":
+							measureKey = "http_response.5xx"
+							break
+						case "response_other":
+							measureKey = "http_response.other"
+							break
+						case "queue_time_avg":
+							measureKey = "qtime"
+							break
+						case "queue_current":
+							measureKey = "qcur"
+							break
+						case "redistributed":
+							measureKey = "wredis"
+							break
+						case "retries":
+							measureKey = "wret"
+						case "response_time_avg":
+							measureKey = "rtime"
+							break
+						case "session_current":
+							measureKey = "scur"
+							break
+						case "session_total":
+							measureKey = "stot"
+							break
+						case "srv_abrt":
+							measureKey = "srv_abort"
+							break
+						case "comp_byp":
+						case "comp_in":
+						case "comp_out":
+						case "comp_rsp":
+						case "downtime":
+						case "req_tot":
+							measureKey = measureSplited[4]
+							break
+						default:
+							log.Printf("Unhandled haproxy metric: %s, keeping this name\n", measureSplited[4])
+							measureKey = measureSplited[4]
+							break
+						}
+
+						rpResults := haproxyRegexp.FindStringSubmatch(measureSplited[2])
+						if len(rpResults) != 3 {
+							log.Printf("Unexpected result while matching haproxy. (%d != 3): %s\n",
+								len(rpResults),
+								measureSplited[2],
+							)
+							continue
+						}
+
+						tags["proxy"] = rpResults[1]
+						tags["type"] = strings.ToLower(rpResults[2])
+						continue
+					}
+
+					switch measureSplited[3] {
+					case "cpu":
+						measureKey = measureSplited[4]
+						tags["cpu"] = fmt.Sprintf("cpu%s", measureSplited[2])
+						break
+					case "haproxy":
+						break
+					}
+				} else {
+					switch measureSplited[1] {
+					case "haproxy":
+						// Ignore those metrics, they are already more precise in each frontend/backend
+						continue
+					}
 				}
 			}
 
@@ -151,24 +270,24 @@ func influxWorker() {
 			bp.AddPoint(p)
 		}
 
-		pre := time.Now()
-		for {
-			err := influxClient.Write(bp)
-			duration := time.Since(pre)
-			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "Failed to write batch point (operation took %v)\n", duration)
-				if skipInfluxErrors {
-					time.Sleep(time.Duration(5) * time.Second) // give InfluxDB to recover
-					continue
-				} else {
-					exit <- 2
-					time.Sleep(time.Duration(100) * time.Second) // give other things chance to complete, and program to exit, without printing "committed"
-				}
-			}
-			influxWriteTimer.Update(duration)
-			finishedFiles <- abstractSerie.Path
-			break
-		}
+		//pre := time.Now()
+		//for {
+		//	err := influxClient.Write(bp)
+		//	duration := time.Since(pre)
+		//	if err != nil {
+		//		_, _ = fmt.Fprintf(os.Stderr, "Failed to write batch point (operation took %v)\n", duration)
+		//		if skipInfluxErrors {
+		//			time.Sleep(time.Duration(5) * time.Second) // give InfluxDB to recover
+		//			continue
+		//		} else {
+		//			exit <- 2
+		//			time.Sleep(time.Duration(100) * time.Second) // give other things chance to complete, and program to exit, without printing "committed"
+		//		}
+		//	}
+		//	influxWriteTimer.Update(duration)
+		//	finishedFiles <- abstractSerie.Path
+		//	break
+		//}
 
 	}
 	influxWorkersWg.Done()
