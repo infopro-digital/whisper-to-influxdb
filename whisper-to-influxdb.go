@@ -159,12 +159,15 @@ func influxWorker() {
 							measureKey = "dreq"
 						case "denied_response":
 							measureKey = "dresp"
+							castTo = 1
 						case "error_connection":
 							measureKey = "econ"
+							castTo = 1
 						case "error_request":
 							measureKey = "ereq"
 						case "error_response":
 							measureKey = "eresp"
+							castTo = 1
 						case "session_rate":
 							measureKey = "rate"
 						case "request_rate":
@@ -200,9 +203,15 @@ func influxWorker() {
 						case "comp_rsp":
 							measureKey = measureSplited[4]
 							castTo = 1
-						//case "comp_byp":
-						//case "comp_in":
-						//case "comp_out":
+						case "comp_byp":
+							measureKey = measureSplited[4]
+							castTo = 1
+						case "comp_in":
+							measureKey = measureSplited[4]
+							castTo = 1
+						case "comp_out":
+							measureKey = measureSplited[4]
+							castTo = 1
 						//case "downtime":
 						//case "req_tot":
 						default:
