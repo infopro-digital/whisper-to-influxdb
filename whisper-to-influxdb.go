@@ -120,7 +120,7 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 	}
 
 	fields := map[string]interface{}{
-		"time": whisperPoint.Timestamp,
+		//"time": whisperPoint.Timestamp,
 	}
 
 	if measureSplitedLen >= 2 {
@@ -222,9 +222,8 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 					measureKey = measureSplited[4]
 					fields[measureKey] = int64(whisperPoint.Value)
 				default:
-					log.Printf("Unhandled haproxy metric: %s, keeping this name\n", measureSplited[4])
-					measureKey = measureSplited[4]
-					fields[measureKey] = whisperPoint.Value
+					log.Printf("Unhandled haproxy metric: %s, dropping\n", measureSplited[4])
+					return nil
 				}
 
 				rpResults := haproxyRegexp.FindStringSubmatch(measureSplited[2])
@@ -278,7 +277,9 @@ func writeBatchPoints(points client.BatchPoints) {
 			}
 
 			_, _ = fmt.Fprintf(os.Stderr, "Failed to write batch point. %v\n", iErr.Error)
-			if skipInfluxErrors {
+
+			// If skip enabled or error is retention, skip
+			if skipInfluxErrors || strings.Contains(iErr.Error, "points beyond retention") {
 				//time.Sleep(time.Duration(5) * time.Second) // give InfluxDB to recover
 				break
 			} else {
@@ -322,8 +323,8 @@ func influxWorker() {
 				measureSplitedLen); p != nil {
 				bp.AddPoint(p)
 
-				//Write each 100 points
-				if len(bp.Points()) == 1000 {
+				// Write each 5000 points
+				if len(bp.Points()) == 5000 {
 					writeBatchPoints(bp)
 					bp, _ = client.NewBatchPoints(client.BatchPointsConfig{
 						Precision: "s",
