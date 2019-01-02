@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/influxdata/influxdb/client/v2"
@@ -45,6 +46,10 @@ var skipWhisperErrors bool
 
 var statsInterval uint
 var exit chan int
+
+type influxError struct {
+	Error string `json:"error"`
+}
 
 func seriesString(bp client.BatchPoints) string {
 	return fmt.Sprintf("InfluxDB series (%d points)", len(bp.Points()))
@@ -105,15 +110,192 @@ func keepOrder() {
 	}
 }
 
-func influxWorker() {
-	haproxyRegexp := regexp.MustCompile(`^\[proxy_name=(.+),service_name=(.+)$`)
-	castTo := 0
+var haproxyRegexp = regexp.MustCompile(`^\[proxy_name=(.+),service_name=(.+)$`)
 
+func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName string, measureKey string,
+	measureSplited []string, measureSplitedLen int) *client.Point {
+	tags := map[string]string{
+		// Host are encoded with _, replace with .
+		"host": strings.Replace(measureSplited[0], "_", ".", -1),
+	}
+
+	fields := map[string]interface{}{
+		"time": whisperPoint.Timestamp,
+	}
+
+	if measureSplitedLen >= 2 {
+		if measureSplitedLen == 5 {
+			switch measureSplited[1] {
+			case "haproxy":
+				switch measureSplited[4] {
+				case "bytes_in":
+					measureKey = "bin"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "bytes_out":
+					measureKey = "bout"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "cli_abrt":
+					measureKey = "cli_abort"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "connect_time_avg":
+					measureKey = "ctime"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "denied_request":
+					measureKey = "dreq"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "denied_response":
+					measureKey = "dresp"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "error_connection":
+					measureKey = "econ"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "error_request":
+					measureKey = "ereq"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "error_response":
+					measureKey = "eresp"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "session_rate":
+					measureKey = "rate"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "request_rate":
+					measureKey = "req_rate"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "response_1xx":
+					measureKey = "http_response.1xx"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "response_2xx":
+					measureKey = "http_response.2xx"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "response_3xx":
+					measureKey = "http_response.3xx"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "response_4xx":
+					measureKey = "http_response.4xx"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "response_5xx":
+					measureKey = "http_response.5xx"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "response_other":
+					measureKey = "http_response.other"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "queue_time_avg":
+					measureKey = "qtime"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "queue_current":
+					measureKey = "qcur"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "redistributed":
+					measureKey = "wredis"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "retries":
+					measureKey = "wret"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "response_time_avg":
+					measureKey = "rtime"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "session_current":
+					measureKey = "scur"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "session_total":
+					measureKey = "stot"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "srv_abrt":
+					measureKey = "srv_abort"
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "comp_rsp":
+					measureKey = measureSplited[4]
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "comp_byp":
+					measureKey = measureSplited[4]
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "comp_in":
+					measureKey = measureSplited[4]
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "comp_out":
+					measureKey = measureSplited[4]
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "downtime":
+					measureKey = measureSplited[4]
+					fields[measureKey] = int64(whisperPoint.Value)
+				case "req_tot":
+					measureKey = measureSplited[4]
+					fields[measureKey] = int64(whisperPoint.Value)
+				default:
+					log.Printf("Unhandled haproxy metric: %s, keeping this name\n", measureSplited[4])
+					measureKey = measureSplited[4]
+					fields[measureKey] = whisperPoint.Value
+				}
+
+				rpResults := haproxyRegexp.FindStringSubmatch(measureSplited[2])
+				if len(rpResults) != 3 {
+					log.Printf("Unexpected result while matching haproxy. (%d != 3): %s\n",
+						len(rpResults),
+						measureSplited[2],
+					)
+					return nil
+				}
+
+				// The regexp is not perfect i know...
+				tags["proxy"] = rpResults[1]
+				tags["type"] = strings.Replace(strings.ToLower(rpResults[2]), "]", "", -1)
+			}
+
+			switch measureSplited[3] {
+			case "cpu":
+				measureKey = measureSplited[4]
+				tags["cpu"] = fmt.Sprintf("cpu%s", measureSplited[2])
+				fields[measureKey] = whisperPoint.Value
+			}
+		} else {
+			switch measureSplited[1] {
+			case "haproxy":
+				// Ignore those metrics, they are already more precise in each frontend/backend
+				return nil
+			}
+		}
+	}
+
+	p, _ := client.NewPoint(measureName, tags, fields,
+		time.Unix(int64(whisperPoint.Timestamp), 0),
+	)
+
+	return p
+}
+
+func writeBatchPoints(points client.BatchPoints) {
+	pre := time.Now()
+	for {
+		err := influxClient.Write(points)
+		duration := time.Since(pre)
+		if err != nil {
+			var iErr influxError
+			err = json.Unmarshal([]byte(err.Error()), &iErr)
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "Unable to unmarshal error from InfluxDB. Error was: %v\n", err)
+				time.Sleep(time.Duration(5) * time.Second) // give InfluxDB to recover
+				continue
+			}
+
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to write batch point. %v\n", iErr.Error)
+			if skipInfluxErrors {
+				//time.Sleep(time.Duration(5) * time.Second) // give InfluxDB to recover
+				break
+			} else {
+				exit <- 2
+				time.Sleep(time.Duration(100) * time.Second) // give other things chance to complete, and program to exit, without printing "committed"
+			}
+		}
+		influxWriteTimer.Update(duration)
+		break
+	}
+}
+func influxWorker() {
 	for abstractSerie := range influxSeries {
-		bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-			Precision: "s",
-			Database:  influxDb,
-		})
+		// No point, ignore it
+		if len(abstractSerie.Points) == 0 {
+			continue
+		}
 
 		basename := strings.TrimSuffix(abstractSerie.Path[len(whisperDir)+1:], ".wsp")
 		measure := strings.Replace(basename, "/", ".", -1)
@@ -130,188 +312,31 @@ func influxWorker() {
 		measureSplitedLen := len(measureSplited)
 		measureName := measureSplited[1]
 
-		// TODO: if there are no points, we can just break out
+		bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+			Precision: "s",
+			Database:  influxDb,
+		})
+
 		for _, abstractPoint := range abstractSerie.Points {
-			tags := map[string]string{
-				// Host are encoded with _, replace with .
-				"host": strings.Replace(measureSplited[0], "_", ".", -1),
-			}
+			if p := transformWhisperPointToInfluxPoint(abstractPoint, measureName, measureKey, measureSplited,
+				measureSplitedLen); p != nil {
+				bp.AddPoint(p)
 
-			castTo = 0
-
-			if measureSplitedLen >= 2 {
-				if measureSplitedLen == 5 {
-					switch measureSplited[1] {
-					case "haproxy":
-						switch measureSplited[4] {
-						case "bytes_in":
-							measureKey = "bin"
-							castTo = 1
-						case "bytes_out":
-							measureKey = "bout"
-							castTo = 1
-						case "cli_abrt":
-							measureKey = "cli_abort"
-							castTo = 1
-						case "connect_time_avg":
-							measureKey = "ctime"
-							castTo = 1
-						case "denied_request":
-							measureKey = "dreq"
-							castTo = 1
-						case "denied_response":
-							measureKey = "dresp"
-							castTo = 1
-						case "error_connection":
-							measureKey = "econ"
-							castTo = 1
-						case "error_request":
-							measureKey = "ereq"
-							castTo = 1
-						case "error_response":
-							measureKey = "eresp"
-							castTo = 1
-						case "session_rate":
-							measureKey = "rate"
-							castTo = 1
-						case "request_rate":
-							measureKey = "req_rate"
-							castTo = 1
-						case "response_1xx":
-							measureKey = "http_response.1xx"
-							castTo = 1
-						case "response_2xx":
-							measureKey = "http_response.2xx"
-							castTo = 1
-						case "response_3xx":
-							measureKey = "http_response.3xx"
-							castTo = 1
-						case "response_4xx":
-							measureKey = "http_response.4xx"
-							castTo = 1
-						case "response_5xx":
-							measureKey = "http_response.5xx"
-							castTo = 1
-						case "response_other":
-							measureKey = "http_response.other"
-							castTo = 1
-						case "queue_time_avg":
-							measureKey = "qtime"
-							castTo = 1
-						case "queue_current":
-							measureKey = "qcur"
-							castTo = 1
-						case "redistributed":
-							measureKey = "wredis"
-							castTo = 1
-						case "retries":
-							measureKey = "wret"
-							castTo = 1
-						case "response_time_avg":
-							measureKey = "rtime"
-							castTo = 1
-						case "session_current":
-							measureKey = "scur"
-							castTo = 1
-						case "session_total":
-							measureKey = "stot"
-							castTo = 1
-						case "srv_abrt":
-							measureKey = "srv_abort"
-							castTo = 1
-						case "comp_rsp":
-							measureKey = measureSplited[4]
-							castTo = 1
-						case "comp_byp":
-							measureKey = measureSplited[4]
-							castTo = 1
-						case "comp_in":
-							measureKey = measureSplited[4]
-							castTo = 1
-						case "comp_out":
-							measureKey = measureSplited[4]
-							castTo = 1
-						case "downtime":
-							measureKey = measureSplited[4]
-							castTo = 1
-						case "req_tot":
-							measureKey = measureSplited[4]
-							castTo = 1
-						default:
-							log.Printf("Unhandled haproxy metric: %s, keeping this name\n", measureSplited[4])
-							measureKey = measureSplited[4]
-						}
-
-						rpResults := haproxyRegexp.FindStringSubmatch(measureSplited[2])
-						if len(rpResults) != 3 {
-							log.Printf("Unexpected result while matching haproxy. (%d != 3): %s\n",
-								len(rpResults),
-								measureSplited[2],
-							)
-							continue
-						}
-
-						// The regexp is not perfect i know...
-						tags["proxy"] = rpResults[1]
-						tags["type"] = strings.Replace(strings.ToLower(rpResults[2]), "]", "", -1)
-					}
-
-					switch measureSplited[3] {
-					case "cpu":
-						measureKey = measureSplited[4]
-						tags["cpu"] = fmt.Sprintf("cpu%s", measureSplited[2])
-					}
-				} else {
-					switch measureSplited[1] {
-					case "haproxy":
-						// Ignore those metrics, they are already more precise in each frontend/backend
-						continue
-					}
+				//Write each 100 points
+				if len(bp.Points()) == 1000 {
+					writeBatchPoints(bp)
+					bp, _ = client.NewBatchPoints(client.BatchPointsConfig{
+						Precision: "s",
+						Database:  influxDb,
+					})
 				}
 			}
-
-			var p *client.Point
-			switch castTo {
-			case 1:
-				p, _ = client.NewPoint(measureName, tags,
-					map[string]interface{}{
-						"time":     abstractPoint.Timestamp,
-						measureKey: int64(abstractPoint.Value),
-					},
-					time.Unix(int64(abstractPoint.Timestamp), 0),
-				)
-			default:
-				p, _ = client.NewPoint(measureName, tags,
-					map[string]interface{}{
-						"time":     abstractPoint.Timestamp,
-						measureKey: abstractPoint.Value,
-					},
-					time.Unix(int64(abstractPoint.Timestamp), 0),
-				)
-			}
-
-			bp.AddPoint(p)
 		}
 
-		pre := time.Now()
-		for {
-			err := influxClient.Write(bp)
-			duration := time.Since(pre)
-			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "Failed to write batch point (operation took %v). Error was: %v\n", duration, err)
-				if skipInfluxErrors {
-					time.Sleep(time.Duration(5) * time.Second) // give InfluxDB to recover
-					continue
-				} else {
-					exit <- 2
-					time.Sleep(time.Duration(100) * time.Second) // give other things chance to complete, and program to exit, without printing "committed"
-				}
-			}
-			influxWriteTimer.Update(duration)
-			finishedFiles <- abstractSerie.Path
-			break
+		if len(bp.Points()) != 0 {
+			writeBatchPoints(bp)
 		}
-
+		finishedFiles <- abstractSerie.Path
 	}
 	influxWorkersWg.Done()
 }
