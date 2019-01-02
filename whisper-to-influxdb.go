@@ -155,8 +155,10 @@ func influxWorker() {
 							castTo = 1
 						case "connect_time_avg":
 							measureKey = "ctime"
+							castTo = 1
 						case "denied_request":
 							measureKey = "dreq"
+							castTo = 1
 						case "denied_response":
 							measureKey = "dresp"
 							castTo = 1
@@ -165,41 +167,58 @@ func influxWorker() {
 							castTo = 1
 						case "error_request":
 							measureKey = "ereq"
+							castTo = 1
 						case "error_response":
 							measureKey = "eresp"
 							castTo = 1
 						case "session_rate":
 							measureKey = "rate"
+							castTo = 1
 						case "request_rate":
 							measureKey = "req_rate"
+							castTo = 1
 						case "response_1xx":
 							measureKey = "http_response.1xx"
+							castTo = 1
 						case "response_2xx":
 							measureKey = "http_response.2xx"
+							castTo = 1
 						case "response_3xx":
 							measureKey = "http_response.3xx"
+							castTo = 1
 						case "response_4xx":
 							measureKey = "http_response.4xx"
+							castTo = 1
 						case "response_5xx":
 							measureKey = "http_response.5xx"
+							castTo = 1
 						case "response_other":
 							measureKey = "http_response.other"
+							castTo = 1
 						case "queue_time_avg":
 							measureKey = "qtime"
+							castTo = 1
 						case "queue_current":
 							measureKey = "qcur"
+							castTo = 1
 						case "redistributed":
 							measureKey = "wredis"
+							castTo = 1
 						case "retries":
 							measureKey = "wret"
+							castTo = 1
 						case "response_time_avg":
 							measureKey = "rtime"
+							castTo = 1
 						case "session_current":
 							measureKey = "scur"
+							castTo = 1
 						case "session_total":
 							measureKey = "stot"
+							castTo = 1
 						case "srv_abrt":
 							measureKey = "srv_abort"
+							castTo = 1
 						case "comp_rsp":
 							measureKey = measureSplited[4]
 							castTo = 1
@@ -212,10 +231,14 @@ func influxWorker() {
 						case "comp_out":
 							measureKey = measureSplited[4]
 							castTo = 1
-						//case "downtime":
-						//case "req_tot":
+						case "downtime":
+							measureKey = measureSplited[4]
+							castTo = 1
+						case "req_tot":
+							measureKey = measureSplited[4]
+							castTo = 1
 						default:
-							//log.Printf("Unhandled haproxy metric: %s, keeping this name\n", measureSplited[4])
+							log.Printf("Unhandled haproxy metric: %s, keeping this name\n", measureSplited[4])
 							measureKey = measureSplited[4]
 						}
 
