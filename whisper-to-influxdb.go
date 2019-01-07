@@ -112,6 +112,199 @@ func keepOrder() {
 
 var haproxyRegexp = regexp.MustCompile(`^\[proxy_name=(.+),service_name=(.+)$`)
 
+func transformHaproxyPoint(measurement string, rawval float64, fields map[string]interface{}) (bool, string) {
+	measureKey := ""
+	switch measurement {
+	case "bytes_in":
+		measureKey = "bin"
+		fields[measureKey] = int64(rawval)
+	case "bytes_out":
+		measureKey = "bout"
+		fields[measureKey] = int64(rawval)
+	case "cli_abrt":
+		measureKey = "cli_abort"
+		fields[measureKey] = int64(rawval)
+	case "connect_time_avg":
+		measureKey = "ctime"
+		fields[measureKey] = int64(rawval)
+	case "denied_request":
+		measureKey = "dreq"
+		fields[measureKey] = int64(rawval)
+	case "denied_response":
+		measureKey = "dresp"
+		fields[measureKey] = int64(rawval)
+	case "error_connection":
+		measureKey = "econ"
+		fields[measureKey] = int64(rawval)
+	case "error_request":
+		measureKey = "ereq"
+		fields[measureKey] = int64(rawval)
+	case "error_response":
+		measureKey = "eresp"
+		fields[measureKey] = int64(rawval)
+	case "session_rate":
+		measureKey = "rate"
+		fields[measureKey] = int64(rawval)
+	case "request_rate":
+		measureKey = "req_rate"
+		fields[measureKey] = int64(rawval)
+	case "response_1xx":
+		measureKey = "http_response.1xx"
+		fields[measureKey] = int64(rawval)
+	case "response_2xx":
+		measureKey = "http_response.2xx"
+		fields[measureKey] = int64(rawval)
+	case "response_3xx":
+		measureKey = "http_response.3xx"
+		fields[measureKey] = int64(rawval)
+	case "response_4xx":
+		measureKey = "http_response.4xx"
+		fields[measureKey] = int64(rawval)
+	case "response_5xx":
+		measureKey = "http_response.5xx"
+		fields[measureKey] = int64(rawval)
+	case "response_other":
+		measureKey = "http_response.other"
+		fields[measureKey] = int64(rawval)
+	case "queue_time_avg":
+		measureKey = "qtime"
+		fields[measureKey] = int64(rawval)
+	case "queue_current":
+		measureKey = "qcur"
+		fields[measureKey] = int64(rawval)
+	case "redistributed":
+		measureKey = "wredis"
+		fields[measureKey] = int64(rawval)
+	case "retries":
+		measureKey = "wret"
+		fields[measureKey] = int64(rawval)
+	case "response_time_avg":
+		measureKey = "rtime"
+		fields[measureKey] = int64(rawval)
+	case "session_current":
+		measureKey = "scur"
+		fields[measureKey] = int64(rawval)
+	case "session_total":
+		measureKey = "stot"
+		fields[measureKey] = int64(rawval)
+	case "srv_abrt":
+		measureKey = "srv_abort"
+		fields[measureKey] = int64(rawval)
+	case "comp_rsp":
+		measureKey = measurement
+		fields[measureKey] = int64(rawval)
+	case "comp_byp":
+		measureKey = measurement
+		fields[measureKey] = int64(rawval)
+	case "comp_in":
+		measureKey = measurement
+		fields[measureKey] = int64(rawval)
+	case "comp_out":
+		measureKey = measurement
+		fields[measureKey] = int64(rawval)
+	case "downtime":
+		measureKey = measurement
+		fields[measureKey] = int64(rawval)
+	case "req_tot":
+		measureKey = measurement
+		fields[measureKey] = int64(rawval)
+	default:
+		log.Printf("Unhandled haproxy metric: %s, dropping\n", measurement)
+		return false, ""
+	}
+
+	return true, measureKey
+}
+
+func transformElasticsearchPoint(measurement string, rawval float64,
+	fields map[string]interface{}) (bool, string, string) {
+	measureKey := ""
+	influxMeasurement := ""
+	switch measurement {
+	case "docs-count":
+		measureKey = "docs_count"
+		fields[measureKey] = rawval
+		influxMeasurement = "elasticsearch_clusterstats_indices"
+	case "docs-deleted":
+		measureKey = "docs_deleted"
+		fields[measureKey] = rawval
+		influxMeasurement = "elasticsearch_clusterstats_indices"
+	case "_shards-total":
+		measureKey = "shards_total"
+		fields[measureKey] = rawval
+		influxMeasurement = "elasticsearch_clusterstats_indices"
+	case "store-size_in_bytes":
+		measureKey = "store_size_in_bytes"
+		fields[measureKey] = rawval
+		influxMeasurement = "elasticsearch_clusterstats_indices"
+
+	case "search-fetch_time_in_millis":
+		measureKey = "search_fetch_time_in_millis"
+		fields[measureKey] = rawval
+		influxMeasurement = "elasticsearch_indices"
+	case "search-fetch_total":
+		measureKey = "search_fetch_total"
+		fields[measureKey] = rawval
+		influxMeasurement = "elasticsearch_indices"
+	case "search-query_time_in_millis":
+		measureKey = "search_query_time_in_millis"
+		fields[measureKey] = rawval
+		influxMeasurement = "elasticsearch_indices"
+	case "search-query_total":
+		measureKey = "search_query_total"
+		fields[measureKey] = rawval
+		influxMeasurement = "elasticsearch_indices"
+	case "search-scroll_time_in_millis":
+		measureKey = "search_scroll_time_in_millis"
+		fields[measureKey] = rawval
+		influxMeasurement = "elasticsearch_indices"
+	case "search-scroll_total":
+		measureKey = "search_scroll_total"
+		fields[measureKey] = rawval
+		influxMeasurement = "elasticsearch_indices"
+
+	case "active_shards":
+		measureKey = "active_shards"
+		fields[measureKey] = int64(rawval)
+		influxMeasurement = "elasticsearch_cluster_health"
+	case "active_primary_shards":
+		measureKey = "active_primary_shards"
+		fields[measureKey] = int64(rawval)
+		influxMeasurement = "elasticsearch_cluster_health"
+	case "initializing_shards":
+		measureKey = "initializing_shards"
+		fields[measureKey] = int64(rawval)
+		influxMeasurement = "elasticsearch_cluster_health"
+	case "number_of_nodes":
+		measureKey = "number_of_nodes"
+		fields[measureKey] = int64(rawval)
+		influxMeasurement = "elasticsearch_cluster_health"
+	case "relocating_shards":
+		measureKey = "relocating_shards"
+		fields[measureKey] = int64(rawval)
+		influxMeasurement = "elasticsearch_cluster_health"
+	case "unassigned_shards":
+		measureKey = "unassigned_shards"
+		fields[measureKey] = int64(rawval)
+		influxMeasurement = "elasticsearch_cluster_health"
+	case "number_of_data_nodes":
+		measureKey = "number_of_data_nodes"
+		fields[measureKey] = int64(rawval)
+		influxMeasurement = "elasticsearch_cluster_health"
+
+	// Not found in telegraf metrics
+	case "_shards-failed":
+		return false, "", ""
+	// Not found in telegraf metrics
+	case "_shards-successful":
+		return false, "", ""
+	default:
+		fmt.Printf("TODO: %v\n", measurement)
+		return false, "", ""
+	}
+	return true, measureKey, influxMeasurement
+}
+
 func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName string, measureKey string,
 	measureSplited []string, measureSplitedLen int) *client.Point {
 	tags := map[string]string{
@@ -119,112 +312,32 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 		"host": strings.Replace(measureSplited[0], "_", ".", -1),
 	}
 
-	fields := map[string]interface{}{
-		//"time": whisperPoint.Timestamp,
-	}
+	fields := map[string]interface{}{}
 
 	if measureSplitedLen >= 2 {
 		if measureSplitedLen == 5 {
 			switch measureSplited[1] {
-			case "haproxy":
-				switch measureSplited[4] {
-				case "bytes_in":
-					measureKey = "bin"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "bytes_out":
-					measureKey = "bout"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "cli_abrt":
-					measureKey = "cli_abort"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "connect_time_avg":
-					measureKey = "ctime"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "denied_request":
-					measureKey = "dreq"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "denied_response":
-					measureKey = "dresp"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "error_connection":
-					measureKey = "econ"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "error_request":
-					measureKey = "ereq"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "error_response":
-					measureKey = "eresp"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "session_rate":
-					measureKey = "rate"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "request_rate":
-					measureKey = "req_rate"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "response_1xx":
-					measureKey = "http_response.1xx"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "response_2xx":
-					measureKey = "http_response.2xx"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "response_3xx":
-					measureKey = "http_response.3xx"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "response_4xx":
-					measureKey = "http_response.4xx"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "response_5xx":
-					measureKey = "http_response.5xx"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "response_other":
-					measureKey = "http_response.other"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "queue_time_avg":
-					measureKey = "qtime"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "queue_current":
-					measureKey = "qcur"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "redistributed":
-					measureKey = "wredis"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "retries":
-					measureKey = "wret"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "response_time_avg":
-					measureKey = "rtime"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "session_current":
-					measureKey = "scur"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "session_total":
-					measureKey = "stot"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "srv_abrt":
-					measureKey = "srv_abort"
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "comp_rsp":
-					measureKey = measureSplited[4]
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "comp_byp":
-					measureKey = measureSplited[4]
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "comp_in":
-					measureKey = measureSplited[4]
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "comp_out":
-					measureKey = measureSplited[4]
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "downtime":
-					measureKey = measureSplited[4]
-					fields[measureKey] = int64(whisperPoint.Value)
-				case "req_tot":
-					measureKey = measureSplited[4]
-					fields[measureKey] = int64(whisperPoint.Value)
+			case "curl_json":
+				switch measureSplited[2] {
+				case "elasticsearch":
+					ok, key, mn := transformElasticsearchPoint(measureSplited[4], whisperPoint.Value, fields)
+					if !ok {
+						return nil
+					}
+
+					measureKey = key
+					measureName = mn
 				default:
-					log.Printf("Unhandled haproxy metric: %s, dropping\n", measureSplited[4])
+					log.Printf("Unhandled curl_json metric: %s, dropping\n", measureSplited[2])
 					return nil
 				}
+			case "haproxy":
+				ok, key := transformHaproxyPoint(measureSplited[4], whisperPoint.Value, fields)
+				if !ok {
+					return nil
+				}
+
+				measureKey = key
 
 				rpResults := haproxyRegexp.FindStringSubmatch(measureSplited[2])
 				if len(rpResults) != 3 {
@@ -253,6 +366,9 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				return nil
 			}
 		}
+	} else {
+		log.Printf("Unknown metric %v, ignoring.\n", measureSplited)
+		return nil
 	}
 
 	p, _ := client.NewPoint(measureName, tags, fields,
