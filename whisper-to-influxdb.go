@@ -305,6 +305,71 @@ func transformElasticsearchPoint(measurement string, rawval float64,
 	return true, measureKey, influxMeasurement
 }
 
+func transformApachePoint(measureCategory string, measureField string, rawval float64,
+	fields map[string]interface{}) (bool, string) {
+	measureKey := ""
+	switch measureCategory {
+	case "":
+		switch measureField {
+		case "apache_connections":
+			measureKey = "BusyWorkers"
+			fields[measureKey] = rawval
+		case "apache_bytes":
+			measureKey = "TotalkBytes"
+			fields[measureKey] = rawval
+		case "apache_idle_workers":
+			measureKey = "IdleWorkers"
+			fields[measureKey] = rawval
+		case "apache_requests": // not sure
+			measureKey = "TotalAccesses"
+			fields[measureKey] = rawval
+		default:
+			return false, ""
+		}
+	case "apache_scoreboard":
+		switch measureField {
+		case "closing":
+			measureKey = "scboard_closing"
+			fields[measureKey] = rawval
+		case "dnslookup":
+			measureKey = "scboard_dnslookup"
+			fields[measureKey] = rawval
+		case "finishing":
+			measureKey = "scboard_finishing"
+			fields[measureKey] = rawval
+		case "idle_cleanup":
+			measureKey = "scboard_idle_cleanup"
+			fields[measureKey] = rawval
+		case "keepalive":
+			measureKey = "scboard_keepalive"
+			fields[measureKey] = rawval
+		case "logging":
+			measureKey = "scboard_logging"
+			fields[measureKey] = rawval
+		case "open":
+			measureKey = "scboard_open"
+			fields[measureKey] = rawval
+		case "reading":
+			measureKey = "scboard_reading"
+			fields[measureKey] = rawval
+		case "sending":
+			measureKey = "scboard_sending"
+			fields[measureKey] = rawval
+		case "starting":
+			measureKey = "scboard_starting"
+			fields[measureKey] = rawval
+		case "waiting":
+			measureKey = "scboard_waiting"
+			fields[measureKey] = rawval
+		default:
+			return false, ""
+		}
+	default:
+		return false, ""
+	}
+	return true, measureKey
+}
+
 func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName string, measureKey string,
 	measureSplited []string, measureSplitedLen int) *client.Point {
 	tags := map[string]string{
@@ -317,6 +382,18 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 	if measureSplitedLen >= 2 {
 		if measureSplitedLen == 5 {
 			switch measureSplited[1] {
+			case "apache":
+				if measureSplited[2] != "apache" {
+					log.Printf("Unhandled apache metric: %s, dropping\n", measureSplited[2])
+					return nil
+				}
+				ok, key := transformApachePoint(measureSplited[3], measureSplited[4], whisperPoint.Value, fields)
+				if !ok {
+					fmt.Printf("TODO: %v\n", measureSplited)
+					return nil
+				}
+
+				measureKey = key
 			case "curl_json":
 				switch measureSplited[2] {
 				case "elasticsearch":
@@ -358,6 +435,24 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				measureKey = measureSplited[4]
 				tags["cpu"] = fmt.Sprintf("cpu%s", measureSplited[2])
 				fields[measureKey] = whisperPoint.Value
+			}
+		} else if measureSplitedLen == 4 {
+			switch measureSplited[1] {
+			case "apache":
+				if measureSplited[2] != "apache" {
+					log.Printf("Unhandled apache metric: %s, dropping\n", measureSplited[2])
+					return nil
+				}
+				ok, key := transformApachePoint("", measureSplited[3], whisperPoint.Value, fields)
+				if !ok {
+					fmt.Printf("TODO: %v\n", measureSplited)
+					return nil
+				}
+
+				measureKey = key
+			default:
+				fmt.Printf("TODO: %v\n", measureSplited)
+				return nil
 			}
 		} else {
 			switch measureSplited[1] {
