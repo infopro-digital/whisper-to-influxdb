@@ -432,7 +432,7 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 
 			switch measureSplited[3] {
 			case "cpu":
-				measureKey = measureSplited[4]
+				measureKey = fmt.Sprintf("usage_%s", measureSplited[4])
 				tags["cpu"] = fmt.Sprintf("cpu%s", measureSplited[2])
 				fields[measureKey] = whisperPoint.Value
 			}
