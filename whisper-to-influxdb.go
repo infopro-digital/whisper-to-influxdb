@@ -450,6 +450,40 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				}
 
 				measureKey = key
+			case "load":
+				if measureSplited[2] != "load" {
+					log.Printf("Unhandled load metric: %s, dropping\n", measureSplited[2])
+					return nil
+				}
+
+				switch measureSplited[3] {
+				case "shortterm":
+					measureKey = "load1"
+				case "midterm":
+					measureKey = "load5"
+				case "longterm":
+					measureKey = "load15"
+				default:
+					log.Printf("Unhandled load metric point: %s, dropping\n", measureSplited[3])
+					return nil
+				}
+
+				measureName = "system"
+				fields[measureKey] = whisperPoint.Value
+			default:
+				fmt.Printf("TODO: %v\n", measureSplited)
+				return nil
+			}
+		} else if measureSplitedLen == 3 {
+			switch measureSplited[1] {
+			case "uptime":
+				if measureSplited[2] != "uptime" {
+					log.Printf("Unhandled uptime metric: %s, dropping\n", measureSplited[2])
+					return nil
+				}
+
+				measureName = "system"
+				fields[measureKey] = int64(whisperPoint.Value)
 			default:
 				fmt.Printf("TODO: %v\n", measureSplited)
 				return nil
