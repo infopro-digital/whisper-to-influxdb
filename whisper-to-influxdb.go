@@ -476,6 +476,14 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 			}
 		} else if measureSplitedLen == 3 {
 			switch measureSplited[1] {
+			case "users":
+				if measureSplited[2] != "users" {
+					log.Printf("Unhandled users metric: %s, dropping\n", measureSplited[2])
+					return nil
+				}
+
+				measureName = "system"
+				fields["n_users"] = int64(whisperPoint.Value)
 			case "uptime":
 				if measureSplited[2] != "uptime" {
 					log.Printf("Unhandled uptime metric: %s, dropping\n", measureSplited[2])
@@ -483,7 +491,7 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				}
 
 				measureName = "system"
-				fields[measureKey] = int64(whisperPoint.Value)
+				fields["uptime"] = int64(whisperPoint.Value)
 			default:
 				fmt.Printf("TODO: %v\n", measureSplited)
 				return nil
