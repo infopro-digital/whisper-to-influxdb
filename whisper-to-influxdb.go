@@ -494,6 +494,37 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 
 				measureName = "system"
 				fields[measureKey] = whisperPoint.Value
+			case "swap":
+				if measureSplited[2] == "swap" {
+					switch measureSplited[3] {
+					case "cached":
+						// This column doesn't exist on telegraf
+						return nil
+					case "free":
+						measureKey = "free"
+					case "used":
+						measureKey = "used"
+					default:
+						log.Printf("Unhandled swap metric point: %s, dropping\n", measureSplited[3])
+						return nil
+					}
+				} else if measureSplited[2] == "swap_io" {
+					switch measureSplited[3] {
+					case "in":
+						measureKey = "in"
+					case "out":
+						measureKey = "out"
+					default:
+						log.Printf("Unhandled swap_io metric point: %s, dropping\n", measureSplited[3])
+						return nil
+					}
+				} else {
+					log.Printf("Unhandled swap metric: %s, dropping\n", measureSplited[2])
+					return nil
+				}
+
+				measureName = "swap"
+				fields[measureKey] = int64(whisperPoint.Value)
 			default:
 				fmt.Printf("TODO: %v\n", measureSplited)
 				return nil
