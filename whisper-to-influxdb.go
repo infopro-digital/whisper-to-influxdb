@@ -450,6 +450,30 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				}
 
 				measureKey = key
+			case "memory":
+				{
+					if measureSplited[2] != "memory" {
+						log.Printf("Unhandled memory metric: %s, dropping\n", measureSplited[2])
+						return nil
+					}
+
+					switch measureSplited[3] {
+					case "buffered":
+						measureKey = "buffered"
+					case "cached":
+						measureKey = "cached"
+					case "free":
+						measureKey = "free"
+					case "used":
+						measureKey = "used"
+					default:
+						log.Printf("Unhandled load metric point: %s, dropping\n", measureSplited[3])
+						return nil
+					}
+
+					measureName = "mem"
+					fields[measureKey] = int64(whisperPoint.Value)
+				}
 			case "load":
 				if measureSplited[2] != "load" {
 					log.Printf("Unhandled load metric: %s, dropping\n", measureSplited[2])
