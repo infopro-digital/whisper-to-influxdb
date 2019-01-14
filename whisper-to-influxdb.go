@@ -428,8 +428,55 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				// The regexp is not perfect i know...
 				tags["proxy"] = rpResults[1]
 				tags["type"] = strings.Replace(strings.ToLower(rpResults[2]), "]", "", -1)
-			}
+			case "interface":
+				// All those metrics are derive on collectd, then converting to influxdb counter will cause problems...
+				measureKey = ""
+				switch measureSplited[3] {
+				case "if_dropped":
+					if measureSplited[4] == "rx" {
+						measureKey = "drop_in"
+					} else if measureSplited[4] == "tx" {
+						measureKey = "drop_out"
+					} else {
+						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
+						return nil
+					}
+				case "if_errors":
+					if measureSplited[4] == "rx" {
+						measureKey = "err_in"
+					} else if measureSplited[4] == "tx" {
+						measureKey = "err_out"
+					} else {
+						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
+						return nil
+					}
+				case "if_packets":
+					if measureSplited[4] == "rx" {
+						measureKey = "packets_recv"
+					} else if measureSplited[4] == "tx" {
+						measureKey = "packets_sent"
+					} else {
+						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
+						return nil
+					}
+				case "if_octets":
+					if measureSplited[4] == "rx" {
+						measureKey = "bytes_recv"
+					} else if measureSplited[4] == "tx" {
+						measureKey = "bytes_sent"
+					} else {
+						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
+						return nil
+					}
+				default:
+					log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
+					return nil
+				}
 
+				measureName = "net"
+				fields[measureKey] = int64(whisperPoint.Value)
+				tags["interface"] = measureSplited[2]
+			}
 			switch measureSplited[3] {
 			case "cpu":
 				measureKey = fmt.Sprintf("usage_%s", measureSplited[4])
