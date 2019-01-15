@@ -408,6 +408,51 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 					log.Printf("Unhandled curl_json metric: %s, dropping\n", measureSplited[2])
 					return nil
 				}
+			case "disk":
+				measureKey = ""
+				switch measureSplited[3] {
+				case "disk_io_time":
+					if measureSplited[4] == "io_time" {
+						measureKey = measureSplited[4]
+					} else if measureSplited[4] == "weighted_io_time" {
+						measureKey = measureSplited[4]
+					} else {
+						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
+						return nil
+					}
+				case "disk_octets":
+					if measureSplited[4] == "read" {
+						measureKey = "read_bytes"
+					} else if measureSplited[4] == "write" {
+						measureKey = "write_bytes"
+					} else {
+						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
+						return nil
+					}
+				case "disk_time":
+					if measureSplited[4] == "read" {
+						measureKey = "read_time"
+					} else if measureSplited[4] == "write" {
+						measureKey = "write_time"
+					} else {
+						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
+						return nil
+					}
+				case "disk_ops":
+					if measureSplited[4] == "read" {
+						measureKey = "reads"
+					} else if measureSplited[4] == "write" {
+						measureKey = "writes"
+					} else {
+						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
+						return nil
+					}
+				}
+
+				measureName = "diskio"
+				fields[measureKey] = int64(whisperPoint.Value)
+				tags["name"] = measureSplited[2]
+
 			case "haproxy":
 				ok, key := transformHaproxyPoint(measureSplited[4], whisperPoint.Value, fields)
 				if !ok {
