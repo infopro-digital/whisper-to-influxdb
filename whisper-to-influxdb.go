@@ -479,36 +479,36 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				switch measureSplited[3] {
 				case "if_dropped":
 					if measureSplited[4] == "rx" {
-						measureKey = "drop_in"
+						measureKey = "drop_in_derived"
 					} else if measureSplited[4] == "tx" {
-						measureKey = "drop_out"
+						measureKey = "drop_out_derived"
 					} else {
 						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "if_errors":
 					if measureSplited[4] == "rx" {
-						measureKey = "err_in"
+						measureKey = "err_in_derived"
 					} else if measureSplited[4] == "tx" {
-						measureKey = "err_out"
+						measureKey = "err_out_derived"
 					} else {
 						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "if_packets":
 					if measureSplited[4] == "rx" {
-						measureKey = "packets_recv"
+						measureKey = "packets_recv_derived"
 					} else if measureSplited[4] == "tx" {
-						measureKey = "packets_sent"
+						measureKey = "packets_sent_derived"
 					} else {
 						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "if_octets":
 					if measureSplited[4] == "rx" {
-						measureKey = "bytes_recv"
+						measureKey = "bytes_recv_derived"
 					} else if measureSplited[4] == "tx" {
-						measureKey = "bytes_sent"
+						measureKey = "bytes_sent_derived"
 					} else {
 						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
@@ -542,6 +542,16 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				}
 
 				measureKey = key
+			case "disk":
+				if measureSplited[3] != "pending_operations" {
+					log.Printf("Unhandled apache metric: %s, dropping\n", measureSplited[2])
+					return nil
+				}
+
+				measureName = "diskio"
+				fields["iops_in_progress"] = int64(whisperPoint.Value)
+				tags["name"] = measureSplited[2]
+
 			case "memory":
 				{
 					if measureSplited[2] != "memory" {
