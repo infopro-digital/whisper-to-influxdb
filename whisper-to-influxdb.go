@@ -413,36 +413,36 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				switch measureSplited[3] {
 				case "disk_io_time":
 					if measureSplited[4] == "io_time" {
-						measureKey = measureSplited[4]
+						measureKey = "io_time_derived"
 					} else if measureSplited[4] == "weighted_io_time" {
-						measureKey = measureSplited[4]
+						measureKey = "weighted_io_time_derived"
 					} else {
 						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "disk_octets":
 					if measureSplited[4] == "read" {
-						measureKey = "read_bytes"
+						measureKey = "read_bytes_derived"
 					} else if measureSplited[4] == "write" {
-						measureKey = "write_bytes"
+						measureKey = "write_bytes_derived"
 					} else {
 						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "disk_time":
 					if measureSplited[4] == "read" {
-						measureKey = "read_time"
+						measureKey = "read_time_derived"
 					} else if measureSplited[4] == "write" {
-						measureKey = "write_time"
+						measureKey = "write_time_derived"
 					} else {
 						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "disk_ops":
 					if measureSplited[4] == "read" {
-						measureKey = "reads"
+						measureKey = "reads_derived"
 					} else if measureSplited[4] == "write" {
-						measureKey = "writes"
+						measureKey = "writes_derived"
 					} else {
 						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
