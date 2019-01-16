@@ -28,3 +28,27 @@ usage of whisper-to-influxdb:
   -whisperDir="/opt/graphite/storage/whisper/": location where all whisper files are stored
   -whisperWorkers=10: specify how many whisper workers
 ```
+
+# Data migration
+
+Some metrics are converted from collectd/graphite to telegraf/influxdb format
+
+This includes:
+
+* CPU
+* Load
+* Memory
+* haproxy (curl_json)
+* elasticsearch (curl_json)
+
+Some metrics are converted from counters to derived gauges by collectd and are pushed to <metric>_derived column in influxdb to prevent wrong derived valued when you query them.
+
+This includes:
+* disk
+* interfaces
+
+Here is an example influxdb query to keep compat in your grafana:
+
+```influxdb
+SELECT mean("reads") as "reads", mean("writes") as "writes" FROM (SELECT non_negative_derivative(mean("reads"), 1s) AS "reads", non_negative_derivative(mean("writes"), 1s) AS "writes" FROM "diskio" WHERE ("host" =~ /^$host$/ AND "name" =~ /^$disk$/) AND $timeFilter GROUP BY time($__interval) fill(null)), (SELECT mean("reads_derived") as "reads", mean("writes_derived") as "writes" FROM "diskio" WHERE ("host" =~ /^$host$/ AND "name" =~ /^$disk$/) AND $timeFilter GROUP BY time($__interval) fill(null)) GROUP BY time($__interval) 
+```
