@@ -596,6 +596,31 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 
 				measureName = "system"
 				fields[measureKey] = whisperPoint.Value
+			case "processes":
+				measureName = "processes"
+				switch measureSplited[2] {
+				case "ps_state":
+					switch measureSplited[3] {
+					case "blocked": // valid
+					case "dead": // valid
+					case "idle": // valid
+					case "paging": // valid
+					case "running": // valid
+					case "sleeping": // valid
+					case "stopped": // valid
+					case "zombies": // valid
+					default:
+						log.Printf("Unhandled processes ps_state metric point: %s, dropping\n", measureSplited[3])
+						return nil
+					}
+
+					measureKey = measureSplited[3]
+					fields[measureKey] = int64(whisperPoint.Value)
+
+				default:
+					log.Printf("Unhandled processes metric point: %s, dropping\n", measureSplited[3])
+					return nil
+				}
 			case "swap":
 				if measureSplited[2] == "swap" {
 					switch measureSplited[3] {
@@ -628,7 +653,7 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				measureName = "swap"
 				fields[measureKey] = int64(whisperPoint.Value)
 			default:
-				fmt.Printf("TODO: %v\n", measureSplited)
+				fmt.Printf("TODO (4 len): %v\n", measureSplited)
 				return nil
 			}
 		} else if measureSplitedLen == 3 {
@@ -650,7 +675,7 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				measureName = "system"
 				fields["uptime"] = int64(whisperPoint.Value)
 			default:
-				fmt.Printf("TODO: %v\n", measureSplited)
+				fmt.Printf("TODO (3 len): %v\n", measureSplited)
 				return nil
 			}
 		} else {
