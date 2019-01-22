@@ -408,6 +408,42 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 					log.Printf("Unhandled curl_json metric: %s, dropping\n", measureSplited[2])
 					return nil
 				}
+			case "df":
+				if measureSplited[3] == "df_complex" {
+					switch measureSplited[4] {
+					case "free":
+						measureKey = measureSplited[4]
+					case "used":
+						measureKey = measureSplited[4]
+					case "reserved": // unused metric in telegraf
+						return nil
+					default:
+						log.Printf("Unhandled df metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
+						return nil
+					}
+				} else {
+					log.Printf("Unhandled df metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
+					return nil
+				}
+
+				// Reformat the path from the metric path
+				path := fmt.Sprintf("/%s", strings.Replace(measureSplited[2], "-", "/", -1))
+
+				// Ignore useless collected paths
+				if path == "/sys/fs/cgroup" || path == "/lib/init/rw" || path == "/dev/shm" || path == "/dev" ||
+					path == "/run" || path == "/run/lock" || path == "/run/user/0" {
+					return nil
+				}
+
+				// /root path is / in collectd/graphite
+				if path == "/root" {
+					path = "/"
+				}
+
+				measureName = "disk"
+				fields[measureKey] = int64(whisperPoint.Value)
+				tags["path"] = path
+
 			case "disk":
 				measureKey = ""
 				switch measureSplited[3] {
