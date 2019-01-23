@@ -578,6 +578,14 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				}
 
 				measureKey = key
+			case "conntrack":
+				if measureSplited[2] != "conntrack" || measureSplited[3] != "max" {
+					log.Printf("Unhandled conntrack metric: %s, dropping\n", measureSplited[2])
+					return nil
+				}
+
+				measureName = "conntrack"
+				fields["ip_conntrack_max"] = whisperPoint.Value
 			case "disk":
 				if measureSplited[3] != "pending_operations" {
 					log.Printf("Unhandled apache metric: %s, dropping\n", measureSplited[2])
@@ -694,6 +702,14 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 			}
 		} else if measureSplitedLen == 3 {
 			switch measureSplited[1] {
+			case "conntrack":
+				if measureSplited[2] != "conntrack" {
+					log.Printf("Unhandled conntrack metric: %s, dropping\n", measureSplited[2])
+					return nil
+				}
+
+				measureName = "conntrack"
+				fields["ip_conntrack_count"] = whisperPoint.Value
 			case "users":
 				if measureSplited[2] != "users" {
 					log.Printf("Unhandled users metric: %s, dropping\n", measureSplited[2])
