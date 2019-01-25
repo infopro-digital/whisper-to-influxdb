@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -370,7 +371,7 @@ func transformApachePoint(measureCategory string, measureField string, rawval fl
 	return true, measureKey
 }
 
-func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName string, measureKey string,
+func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName string, measureField string,
 	measureSplited []string, measureSplitedLen int) *client.Point {
 	tags := map[string]string{
 		// Host are encoded with _, replace with .
@@ -393,7 +394,7 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 					return nil
 				}
 
-				measureKey = key
+				measureField = key
 			case "curl_json":
 				switch measureSplited[2] {
 				case "elasticsearch":
@@ -402,7 +403,7 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 						return nil
 					}
 
-					measureKey = key
+					measureField = key
 					measureName = mn
 				default:
 					log.Printf("Unhandled curl_json metric: %s, dropping\n", measureSplited[2])
@@ -412,9 +413,9 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				if measureSplited[3] == "df_complex" {
 					switch measureSplited[4] {
 					case "free":
-						measureKey = measureSplited[4]
+						measureField = measureSplited[4]
 					case "used":
-						measureKey = measureSplited[4]
+						measureField = measureSplited[4]
 					case "reserved": // unused metric in telegraf
 						return nil
 					default:
@@ -441,44 +442,44 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				}
 
 				measureName = "disk"
-				fields[measureKey] = int64(whisperPoint.Value)
+				fields[measureField] = int64(whisperPoint.Value)
 				tags["path"] = path
 
 			case "disk":
-				measureKey = ""
+				measureField = ""
 				switch measureSplited[3] {
 				case "disk_io_time":
 					if measureSplited[4] == "io_time" {
-						measureKey = "io_time_derived"
+						measureField = "io_time_derived"
 					} else if measureSplited[4] == "weighted_io_time" {
-						measureKey = "weighted_io_time_derived"
+						measureField = "weighted_io_time_derived"
 					} else {
 						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "disk_octets":
 					if measureSplited[4] == "read" {
-						measureKey = "read_bytes_derived"
+						measureField = "read_bytes_derived"
 					} else if measureSplited[4] == "write" {
-						measureKey = "write_bytes_derived"
+						measureField = "write_bytes_derived"
 					} else {
 						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "disk_time":
 					if measureSplited[4] == "read" {
-						measureKey = "read_time_derived"
+						measureField = "read_time_derived"
 					} else if measureSplited[4] == "write" {
-						measureKey = "write_time_derived"
+						measureField = "write_time_derived"
 					} else {
 						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "disk_ops":
 					if measureSplited[4] == "read" {
-						measureKey = "reads_derived"
+						measureField = "reads_derived"
 					} else if measureSplited[4] == "write" {
-						measureKey = "writes_derived"
+						measureField = "writes_derived"
 					} else {
 						log.Printf("Unhandled disk metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
@@ -486,7 +487,7 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				}
 
 				measureName = "diskio"
-				fields[measureKey] = int64(whisperPoint.Value)
+				fields[measureField] = int64(whisperPoint.Value)
 				tags["name"] = measureSplited[2]
 
 			case "haproxy":
@@ -495,7 +496,7 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 					return nil
 				}
 
-				measureKey = key
+				measureField = key
 
 				rpResults := haproxyRegexp.FindStringSubmatch(measureSplited[2])
 				if len(rpResults) != 3 {
@@ -511,40 +512,40 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				tags["type"] = strings.Replace(strings.ToLower(rpResults[2]), "]", "", -1)
 			case "interface":
 				// All those metrics are derive on collectd, then converting to influxdb counter will cause problems...
-				measureKey = ""
+				measureField = ""
 				switch measureSplited[3] {
 				case "if_dropped":
 					if measureSplited[4] == "rx" {
-						measureKey = "drop_in_derived"
+						measureField = "drop_in_derived"
 					} else if measureSplited[4] == "tx" {
-						measureKey = "drop_out_derived"
+						measureField = "drop_out_derived"
 					} else {
 						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "if_errors":
 					if measureSplited[4] == "rx" {
-						measureKey = "err_in_derived"
+						measureField = "err_in_derived"
 					} else if measureSplited[4] == "tx" {
-						measureKey = "err_out_derived"
+						measureField = "err_out_derived"
 					} else {
 						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "if_packets":
 					if measureSplited[4] == "rx" {
-						measureKey = "packets_recv_derived"
+						measureField = "packets_recv_derived"
 					} else if measureSplited[4] == "tx" {
-						measureKey = "packets_sent_derived"
+						measureField = "packets_sent_derived"
 					} else {
 						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
 					}
 				case "if_octets":
 					if measureSplited[4] == "rx" {
-						measureKey = "bytes_recv_derived"
+						measureField = "bytes_recv_derived"
 					} else if measureSplited[4] == "tx" {
-						measureKey = "bytes_sent_derived"
+						measureField = "bytes_sent_derived"
 					} else {
 						log.Printf("Unhandled interface metric: %s/%s, dropping\n", measureSplited[3], measureSplited[4])
 						return nil
@@ -555,14 +556,60 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				}
 
 				measureName = "net"
-				fields[measureKey] = int64(whisperPoint.Value)
+				fields[measureField] = int64(whisperPoint.Value)
 				tags["interface"] = measureSplited[2]
+			case "tcpconns":
+				portExtract := strings.Split(measureSplited[2], "-")
+				if len(portExtract) != 2 {
+					log.Printf("Invalid tcpconns port extraction: %v for %s/%s, dropping\n", portExtract,
+						measureSplited[3], measureSplited[4])
+					return nil
+				}
+
+				_, err := strconv.Atoi(portExtract[0])
+				if err != nil {
+					log.Printf("Invalid tcpconns port: %s for %s/%s, dropping\n", portExtract[0],
+						measureSplited[3], measureSplited[4])
+					return nil
+				}
+
+				switch measureSplited[4] {
+				case "CLOSED":
+					measureField = "tcp_close"
+				case "CLOSING":
+					measureField = "tcp_closing"
+				case "CLOSE_WAIT":
+					measureField = "tcp_close_wait"
+				case "ESTABLISHED":
+					measureField = "tcp_established"
+				case "FIN_WAIT1":
+					measureField = "tcp_fin_wait1"
+				case "FIN_WAIT2":
+					measureField = "tcp_fin_wait2"
+				case "LAST_ACK":
+					measureField = "tcp_last_ack"
+				case "LISTEN":
+					measureField = "tcp_listen"
+				case "SYN_RECV":
+					measureField = "tcp_syn_recv"
+				case "SYN_SENT":
+					measureField = "tcp_syn_sent"
+				case "TIME_WAIT":
+					measureField = "tcp_time_wait"
+				default:
+					log.Printf("Unhandled tcpconns state: %s, dropping\n", measureSplited[4])
+					return nil
+				}
+
+				measureName = "netstat"
+				fields[measureField] = int64(whisperPoint.Value)
+				tags["port"] = portExtract[0]
 			}
 			switch measureSplited[3] {
 			case "cpu":
-				measureKey = fmt.Sprintf("usage_%s", measureSplited[4])
+				measureField = fmt.Sprintf("usage_%s", measureSplited[4])
 				tags["cpu"] = fmt.Sprintf("cpu%s", measureSplited[2])
-				fields[measureKey] = whisperPoint.Value
+				fields[measureField] = whisperPoint.Value
 			}
 		} else if measureSplitedLen == 4 {
 			switch measureSplited[1] {
@@ -577,7 +624,7 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 					return nil
 				}
 
-				measureKey = key
+				measureField = key
 			case "conntrack":
 				if measureSplited[2] != "conntrack" || measureSplited[3] != "max" {
 					log.Printf("Unhandled conntrack metric: %s, dropping\n", measureSplited[2])
@@ -605,20 +652,20 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 
 					switch measureSplited[3] {
 					case "buffered":
-						measureKey = "buffered"
+						measureField = "buffered"
 					case "cached":
-						measureKey = "cached"
+						measureField = "cached"
 					case "free":
-						measureKey = "free"
+						measureField = "free"
 					case "used":
-						measureKey = "used"
+						measureField = "used"
 					default:
 						log.Printf("Unhandled load metric point: %s, dropping\n", measureSplited[3])
 						return nil
 					}
 
 					measureName = "mem"
-					fields[measureKey] = int64(whisperPoint.Value)
+					fields[measureField] = int64(whisperPoint.Value)
 				}
 			case "load":
 				if measureSplited[2] != "load" {
@@ -628,18 +675,18 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 
 				switch measureSplited[3] {
 				case "shortterm":
-					measureKey = "load1"
+					measureField = "load1"
 				case "midterm":
-					measureKey = "load5"
+					measureField = "load5"
 				case "longterm":
-					measureKey = "load15"
+					measureField = "load15"
 				default:
 					log.Printf("Unhandled load metric point: %s, dropping\n", measureSplited[3])
 					return nil
 				}
 
 				measureName = "system"
-				fields[measureKey] = whisperPoint.Value
+				fields[measureField] = whisperPoint.Value
 			case "processes":
 				measureName = "processes"
 				switch measureSplited[2] {
@@ -658,8 +705,8 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 						return nil
 					}
 
-					measureKey = measureSplited[3]
-					fields[measureKey] = int64(whisperPoint.Value)
+					measureField = measureSplited[3]
+					fields[measureField] = int64(whisperPoint.Value)
 
 				default:
 					log.Printf("Unhandled processes metric point: %s, dropping\n", measureSplited[3])
@@ -672,9 +719,9 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 						// This column doesn't exist on telegraf
 						return nil
 					case "free":
-						measureKey = "free"
+						measureField = "free"
 					case "used":
-						measureKey = "used"
+						measureField = "used"
 					default:
 						log.Printf("Unhandled swap metric point: %s, dropping\n", measureSplited[3])
 						return nil
@@ -682,9 +729,9 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				} else if measureSplited[2] == "swap_io" {
 					switch measureSplited[3] {
 					case "in":
-						measureKey = "in"
+						measureField = "in"
 					case "out":
-						measureKey = "out"
+						measureField = "out"
 					default:
 						log.Printf("Unhandled swap_io metric point: %s, dropping\n", measureSplited[3])
 						return nil
@@ -695,7 +742,7 @@ func transformWhisperPointToInfluxPoint(whisperPoint whisper.Point, measureName 
 				}
 
 				measureName = "swap"
-				fields[measureKey] = int64(whisperPoint.Value)
+				fields[measureField] = int64(whisperPoint.Value)
 			default:
 				fmt.Printf("TODO (4 len): %v\n", measureSplited)
 				return nil
